@@ -88,7 +88,7 @@ public class DistributedBubbleRap implements RoutingDecisionEngine, CommunityDet
 			this.centrality = (Centrality) 
 				s.createIntializedObject(s.getSetting(CENTRALITY_ALG_SETTING));
 		else
-			this.centrality = new SWindowCentrality(s);
+			this.centrality = new SWindowCentralityAlt(s);
 	}
 	
 	/**
@@ -261,4 +261,38 @@ public class DistributedBubbleRap implements RoutingDecisionEngine, CommunityDet
 
     @Override
     public void update(DTNHost thisHost) {}
+
+	public double[] getGlobalCentralities() {
+		int days = (int)Math.ceil(SimClock.getTime() / 86400.0);
+		double[] centralities = new double[days];
+		
+		for (int i = 0; i < days; i++) {
+			double startTime = i * 86400;
+			double endTime = (i + 1) * 86400;
+			if (endTime > SimClock.getTime()) {
+				endTime = SimClock.getTime();
+			}
+						
+			Map<DTNHost, List<Duration>> dailyConnHistory = new HashMap<>();
+			
+			for (Map.Entry<DTNHost, List<Duration>> entry : connHistory.entrySet()) {
+				List<Duration> dailyDurations = new ArrayList<>();
+				for (Duration d : entry.getValue()) {
+					if (d.start >= startTime && d.end <= endTime) {
+						dailyDurations.add(d);
+					}
+				}
+				if (!dailyDurations.isEmpty()) {
+					dailyConnHistory.put(entry.getKey(), dailyDurations);
+				}
+			}
+			
+			// Calculate centrality
+			double globalCentrality = this.centrality.getGlobalCentrality(dailyConnHistory);
+			
+			centralities[i] = globalCentrality;
+		}
+		
+		return centralities;
+	}
 }

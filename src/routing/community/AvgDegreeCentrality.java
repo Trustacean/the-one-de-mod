@@ -22,7 +22,7 @@ import core.*;
  * past six hours does. They further claim that computing this value for all
  * time is difficult and state that computing a average for multiple six hour 
  * periods in the past would be a better measure, which they do in two other 
- * algorithms, {@link CWindowCentrality} and {@link SWindowCentrality}. A third
+ * algorithms, {@link CWindowCentrality} and {@link SWindowCentralityAlt}. A third
  * algorithm called DEGREE is also presented as a computation of the node degree
  * for all time, but it's unclear whether this refers to an average over all
  * prior six-hour time windows or simply the total number of prior unique 

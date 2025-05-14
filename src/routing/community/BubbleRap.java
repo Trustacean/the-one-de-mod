@@ -21,7 +21,7 @@ public class BubbleRap implements RoutingDecisionEngine, CommunityDetectionEngin
     protected Map<DTNHost, List<Duration>> connHistory;
 
     protected CommunityDetection community; // added
-    protected Centrality centrality;
+    protected CWindowCentrality centrality;
 
     // End-initialisation
     // Constructor based on the settings
@@ -33,17 +33,13 @@ public class BubbleRap implements RoutingDecisionEngine, CommunityDetectionEngin
             this.community = new SimpleCommunityDetection(s);
         }
 
-        if (s.contains(CENTRALITY_ALG_SETTING)) {
-            this.centrality = (Centrality) s.createIntializedObject(s.getSetting(CENTRALITY_ALG_SETTING));
-        } else {
-            this.centrality = new AverageWinCentrality1(s);
-        }
+        this.centrality = new CWindowCentrality(s);
     }
 
     // Constructor based on the argument prototype
     public BubbleRap(BubbleRap proto) {
         this.community = proto.community.replicate(); // added
-        this.centrality = proto.centrality.replicate();
+        this.centrality = (CWindowCentrality) proto.centrality.replicate();
         startTimestamps = new HashMap<DTNHost, Double>();
         connHistory = new HashMap<DTNHost, List<Duration>>();
     }
@@ -197,4 +193,7 @@ public class BubbleRap implements RoutingDecisionEngine, CommunityDetectionEngin
     public void update(DTNHost thisHost) {
     }
 
+    public double[] getGlobalCentralities() {
+        return centrality.getGlobalCentralities(connHistory);
+    }
 }

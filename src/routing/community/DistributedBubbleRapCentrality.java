@@ -88,7 +88,7 @@ public class DistributedBubbleRapCentrality implements RoutingDecisionEngine, Co
 			this.centrality = (Centrality) 
 				s.createIntializedObject(s.getSetting(CENTRALITY_ALG_SETTING));
 		else
-			this.centrality = new SWindowCentrality(s);
+			this.centrality = new SWindowCentralityAlt(s);
 	}
 	
 	/**

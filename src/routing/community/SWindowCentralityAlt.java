@@ -1,5 +1,5 @@
 /*
- * @(#)SWindowCentrality.java
+ * @(#)SWindowCentralityAlt.java
  *
  * Copyright 2010 by University of Pittsburgh, released under GPLv3.
  * 
@@ -7,8 +7,11 @@
 package routing.community;
 
 import core.*;
+import interfaces.Centralities;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * <p>
@@ -55,7 +58,7 @@ import java.util.Map;
  *
  * @author PJ Dillon, University of Pittsburgh
  */
-public class SWindowCentrality implements Centrality {
+public class SWindowCentralityAlt implements Centrality, Centralities {
 
     /**
      * length of time into the past to consider -setting id {@value}
@@ -94,13 +97,13 @@ public class SWindowCentrality implements Centrality {
      */
     protected int lastLocalComputationTime;
 
-    public SWindowCentrality(Settings s) {
+    public SWindowCentralityAlt(Settings s) {
         if (s.contains(CENTRALITY_WINDOW_SETTING)) {
             CENTRALITY_TIME_WINDOW = s.getInt(CENTRALITY_WINDOW_SETTING);
         }
     }
 
-    public SWindowCentrality(SWindowCentralityAlt proto) {
+    public SWindowCentralityAlt(SWindowCentralityAlt proto) {
         // set these back in time (negative values) to do one computation at the 
         // start of the sim
         this.lastGlobalComputationTime = this.lastLocalComputationTime
@@ -153,7 +156,39 @@ public class SWindowCentrality implements Centrality {
         return this.localCentrality = centrality;
     }
 
-    public Centrality replicate() {
+    public SWindowCentralityAlt replicate() {
         return new SWindowCentralityAlt(this);
+    }
+
+    @Override
+    public double[] getGlobalCentralities(Map<DTNHost, List<Duration>> connHistory) {
+        int days = (int)Math.ceil(SimClock.getTime() / 86400.0);
+        double[] uniquePeers = new double[days];
+        
+        for (int i = 0; i < days; i++) {
+            double startTime = i * 86400;
+            double endTime = (i + 1) * 86400;
+            if (endTime > SimClock.getTime()) {
+                endTime = SimClock.getTime();
+            }
+            
+            Set<DTNHost> dailyUniquePeers = new HashSet<>();
+            
+            for (Map.Entry<DTNHost, List<Duration>> entry : connHistory.entrySet()) {
+                DTNHost host = entry.getKey();
+                List<Duration> durations = entry.getValue();
+                
+                for (Duration d : durations) {
+                    if ((d.start <= endTime) && (d.end >= startTime)) {
+                        dailyUniquePeers.add(host);
+                        break;
+                    }
+                }
+            }
+            
+            uniquePeers[i] = dailyUniquePeers.size();
+        }
+        
+        return uniquePeers;
     }
 }

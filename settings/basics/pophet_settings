@@ -1,14 +1,13 @@
+a
 ## Scenario settings
-#Scenario.name = Haggle3-Infocom5-normalisasivariansi
-Scenario.name = bubble_rap2
+Scenario.name = Haggle-ProphetReport
 Scenario.simulateConnections = false
 Scenario.updateInterval = 1
 # 43200s == 12h
-Scenario.endTime = 1698181
+Scenario.endTime = 8490908
 
 # 16981816 Reality 8490908
 # 274883 Haggle 3 Infocom 5
-
 
 ## Interface-specific settings:
 # type : which interface class the interface belongs to
@@ -28,21 +27,14 @@ btInterface.scanInterval = 120
 Scenario.nrofHostGroups = 1
 
 # Router
-Group.movementModel = RandomWaypoint
+Group.movementModel = StationaryMovement
 #Group.router = EpidemicRouter
-Group.router = DecisionEngineRouter
+Group.router = ProphetRouter
 #ProphetRouter.secondsInTimeUnit = 30
-#DecisionEngineRouter.decisionEngine = ProphetDecisionEngine
+#DecisionEngineRouter.decisionEngine = fuzzy.FuzzyBasedRouter
+#DecisionEngineRouter.fclSimilarity = fcl/SimilarityReality.fcl
 
-DecisionEngineRouter.decisionEngine = community.DistributedBubbleRap
-DecisionEngineRouter.communityDetectAlg = routing.community.KCliqueCommunityDetection
-DecisionEngineRouter.K = 5
-DecisionEngineRouter.familiarThreshold = 700
-DecisionEngineRouter.centralityAlg = routing.community.CWindowCentrality
-
-#DecisionEngineRouter.fclSimilarity = fcl/Haggle3-Infocom5.fcl
-
-Group.bufferSize = 20M
+Group.bufferSize = 30M
 # 10M Haggle3 - Infocom5
 # 20M Reality
 
@@ -55,13 +47,12 @@ Group.speed = 0.5, 1.5
 # Message TTL of 300 minutes (5 hours)
 ## TTL 24 hours=1440, 1 week= 10080, 3 weeks= 30240, 5 weeks= 50400
 Group.msgTtl = 20160
-#4320 Haggle 3 infocom 5
+#360 Haggle 3 infocom 5
 #10080 Reality 20160
 
 # group1 (pedestrians) specific settings
 Group1.groupID = P
 #Group1.waitTime = 0, 43800
-#Group1.waitTime = 0, 23586
 # Haggle3-Infocom5 43800
 
 Group1.nrofHosts = 97
@@ -74,30 +65,27 @@ Events.nrof = 2
 Events1.class = ExternalEventsQueue
 # (following settings are specific for the MessageEventGenerator class)
 # Creation interval in seconds (one new message every 25 to 35 seconds)
-Events1.filePath = RealityConnectionTraceFinal.txt
-#Haggle3-Infocom5.csv
+Events1.filePath = ./datasets/Haggle3.txt
+# Haggle3-Infocom5.csv
 # RealityConnectionTraceFinal.txt
 
 Events2.class = MessageEventGenerator
 # change interval to have more or less messages, see javadocs for more information.
 
-Events2.interval = 290, 310
+Events2.interval = 1160, 1240
 
-# 25, 30 (~120 texts/hour)
-# 290, 310 (~12 texts/hour) Reality
+# 25,30 (~120 texts/hour)
+# 290, 310 (~12 texts/hour) Reality1
 # 580, 620 (~ 6 texts/hour)
-# 1160, 1240 (~ 3 texts/ hour) Haggle3 - Infocom5
+# 1160, 1240 (~ 3 texts/ hour) Haggle3 - Infocom5, Reality2
 # 2320, 2480 (~ 1 texts/ hour)
 
-Events2.size = 250k,300k
-# Haggle3-Infocom5 250k,300k
-# Reality 20k 1/2 10k
-
+Events2.size = 10k
 # range of message source/destination addresses
-Events2.hosts = 0, 97
+Events2.hosts = 0,96
 Events2.prefix = M
 
-Events2.time = 0, 253283
+Events2.time = 0, 6792726
 #274883 Haggle 3 infocom 5 253283
 #16981816 Reality 16377016 15772216
 
@@ -110,19 +98,14 @@ MovementModel.worldSize = 100, 100
 MovementModel.warmup = 1000
 
 # how many reports to load
-Report.nrofReports = 2
+Report.nrofReports = 1
 # length of the warm up period (simulated seconds)
 Report.warmup = 1
 # default directory of reports (can be overridden per Report with output setting)
-#Report.reportDir = reports/FuzzyDataSet/Haggle3-Infocom5/SimilarityDataSet
-Report.reportDir = reports/bubble_rap2
-#Report.reportDir = reports/FuzzyDataSet/Haggle3-Infocom5/VarianceBufferDataSet
-#Report.reportDir = reports/FuzzyFix/Haggle3-Infocom5
- Report classes to load
+Report.reportDir = reports/prop/Reality
+# Report classes to load
 Report.report1 = MessageStatsReport
-Report.report2 = CommunityDetectionReport
-#Report.report1 = BufferOccupancyReport
-#Report.report1 = ResourceNodeTiapWaktuReport
+#Report.report1 = ClosenessNodeTiapWaktuReport
 #Report.report1 = MessageDeliveredPerContactReport
 #Report.report2 = NumberOfHopsPerMsgPerTimeReport
 #Report.report3 = PercentageMessageDeliveredPerContactReport
@@ -130,3 +113,4 @@ Report.report2 = CommunityDetectionReport
 #Report.report5 = OverheadPerContactReport
 #Report.report6 = NumberOfForwardReport
 #Report.report7 = MessageCopyCountReport
+#Report.closenessToNodeID = [0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16;17;18;19;20;21;22;23;24;25;26;27;28;29;30;31;32;33;34;35;36;37;38;39;40;41;42;43;44;45;46;47;48;49;50;51;52;53;54;55;56;57;58;59;60;61;62;63;64;65;66;67;68;69;70;71;72;73;74;75;76;77;78;79;80;81;82;83;84;85;86;87;88;89;90;91;92;93;94;95;96]

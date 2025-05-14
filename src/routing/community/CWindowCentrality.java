@@ -9,6 +9,7 @@ package routing.community;
 import java.util.*;
 
 import core.*;
+import interfaces.Centralities;
 
 /**
  * <p>Computes the global and local centrality of a node using the CWindow 
@@ -60,7 +61,7 @@ import core.*;
  * @author PJ Dillon, University of Pittsburgh
  * @see Centrality
  */
-public class CWindowCentrality implements Centrality
+public class CWindowCentrality implements Centrality, Centralities
 {
 	/** length of time to consider in each epoch -setting id {@value} */
 	public static final String CENTRALITY_WINDOW_SETTING = "timeWindow";
@@ -73,7 +74,7 @@ public class CWindowCentrality implements Centrality
 	/** Time to wait before recomputing centrality values (node degree) */
 	protected static int COMPUTE_INTERVAL = 600; // seconds, i.e. 10 minutes
 	/** Width of each time interval in which to count the node's degree */
-	protected static int CENTRALITY_TIME_WINDOW = 21600; // 6 hours
+	protected static int CENTRALITY_TIME_WINDOW = 86400; // 24 hours
 	/** Number of time intervals to average the node's degree over */
 	protected static int EPOCH_COUNT = 787; // CHANGED FROM 5,48;
 	
@@ -268,4 +269,34 @@ public class CWindowCentrality implements Centrality
 		return new CWindowCentrality(this);
 	}
 
+	@Override
+    public double[] getGlobalCentralities(Map<DTNHost, List<Duration>> connHistory) {
+		final double currTime = SimClock.getTime();
+		final int periods = (int) (currTime / CENTRALITY_TIME_WINDOW);
+		
+		double[] centralityMetrics = new double[periods];
+		
+		Set<DTNHost>[] periodicEncounters = new HashSet[periods];
+		for (int i = 0; i < periods; i++) {
+			periodicEncounters[i] = new HashSet<>();
+		}
+		
+		for (Map.Entry<DTNHost, List<Duration>> entry : connHistory.entrySet()) {
+			DTNHost h = entry.getKey();
+			for (Duration d : entry.getValue()) {
+				int timePassed = (int) (currTime - d.end);
+				int epoch = timePassed / CENTRALITY_TIME_WINDOW;
+				if (epoch < 0 || epoch >= periods) {
+					continue;
+				}
+				periodicEncounters[epoch].add(h);
+			}
+		}
+		
+		for (int i = 0; i < periods; i++) {
+			centralityMetrics[i] = periodicEncounters[i].size();
+		}
+		
+		return centralityMetrics;
+    }
 }
