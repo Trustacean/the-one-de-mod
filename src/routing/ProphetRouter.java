@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Implementation of PRoPHET router as described in
@@ -56,6 +57,13 @@ public class ProphetRouter extends ActiveRouter {
     public static final String BETA_S = "beta";
 
     /**
+     * Forwarding strategy -setting id ({@value}). The forwarding strategy
+     * defines how the router should choose the next hop for a message. The
+     * default value is {@link #GRTR_MAX}.
+     */
+    public static final String FORWARDING_STRATEGY_S = "forwardingStrategy";
+
+    /**
      * the value of nrof seconds in time unit -setting
      */
     private int secondsInTimeUnit;
@@ -73,6 +81,10 @@ public class ProphetRouter extends ActiveRouter {
      */
     private double lastAgeUpdate;
 
+    private ForwardingStrategy forwardingStrategy;
+
+    private ForwardingStrategyEnum forwardingStrategyEnum;
+
     /**
      * Constructor. Creates a new message router based on the settings in the
      * given Settings object.
@@ -89,6 +101,27 @@ public class ProphetRouter extends ActiveRouter {
             beta = DEFAULT_BETA;
         }
 
+        if (prophetSettings.contains(FORWARDING_STRATEGY_S)) {
+            this.forwardingStrategyEnum = ForwardingStrategyEnum.of(prophetSettings.getSetting(FORWARDING_STRATEGY_S));
+            switch (forwardingStrategyEnum) {
+                case GRTRMax:
+                    forwardingStrategy = new GRTRMaxTupleComparator();
+                    break;
+                case GRTRSort:
+                    forwardingStrategy = new GRTRSortTupleComparator();
+                    break;
+                case GRTR:
+                    forwardingStrategy = new GRTRTupleComparator();
+                    break;
+                case COIN:
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown forwarding strategy: " + forwardingStrategyEnum);
+            }
+        } else {
+            this.forwardingStrategy = new GRTRMaxTupleComparator();
+            this.forwardingStrategyEnum = ForwardingStrategyEnum.GRTRMax;
+        }
         initPreds();
     }
 
@@ -101,6 +134,7 @@ public class ProphetRouter extends ActiveRouter {
         super(r);
         this.secondsInTimeUnit = r.secondsInTimeUnit;
         this.beta = r.beta;
+        this.forwardingStrategy = r.forwardingStrategy;
         initPreds();
     }
 
@@ -150,7 +184,7 @@ public class ProphetRouter extends ActiveRouter {
 
     /**
      * Updates transitive (A->B->C) delivery predictions.      <CODE>P(a,c) = P(a,c)_old + (1 - P(a,c)_old) * P(a,b) * P(b,c) * BETA
-	 * </CODE>
+     * </CODE>
      *
      * @param host The B host who we just met
      */
@@ -247,10 +281,16 @@ public class ProphetRouter extends ActiveRouter {
                 if (othRouter.hasMessage(m.getId())) {
                     continue; // skip messages that the other one has
                 }
-                tryAllMessagesToAllConnections();
-                if (othRouter.getPredFor(m.getTo()) > getPredFor(m.getTo())) {
-                    // the other node has higher probability of delivery
-                    messages.add(new Tuple<Message, Connection>(m, con));
+                if (forwardingStrategyEnum == ForwardingStrategyEnum.COIN) {
+                    Random rand = new Random();
+                    if (rand.nextBoolean()) {
+                        messages.add(new Tuple<Message, Connection>(m, con));
+                    }
+                } else {
+                    if (othRouter.getPredFor(m.getTo()) > getPredFor(m.getTo())) {
+                        // the other node has higher probability of delivery
+                        messages.add(new Tuple<Message, Connection>(m, con));
+                    }
                 }
             }
         }
@@ -260,38 +300,12 @@ public class ProphetRouter extends ActiveRouter {
         }
         // System.out.println(messages);
         // sort the message-connection tuples
-        Collections.sort(messages, new GRTRMaxTupleComparator());
-        return tryMessagesForConnected(messages);	// try to send messages
-    }
-
-    /**
-     * Comparator for Message-Connection-Tuples that orders the tuples by their
-     * delivery probability by the host on the other side of the connection
-     * (GRTRMax)
-     */
-    private class GRTRMaxTupleComparator implements Comparator<Tuple<Message, Connection>> {
-
-        public int compare(Tuple<Message, Connection> tuple1,
-                Tuple<Message, Connection> tuple2) {
-            // delivery probability of tuple1's message with tuple1's connection
-            double p1 = ((ProphetRouter) tuple1.getValue().
-                    getOtherNode(getHost()).getRouter()).getPredFor(
-                    tuple1.getKey().getTo());
-            // -"- tuple2...
-            double p2 = ((ProphetRouter) tuple2.getValue().
-                    getOtherNode(getHost()).getRouter()).getPredFor(
-                    tuple2.getKey().getTo());
-
-            // bigger probability should come first
-            if (p2 - p1 == 0) {
-                /* equal probabilities -> let queue mode decide */
-                return compareByQueueMode(tuple1.getKey(), tuple2.getKey());
-            } else if (p2 - p1 < 0) {
-                return -1;
-            } else {
-                return 1;
-            }
+        if (forwardingStrategyEnum == ForwardingStrategyEnum.COIN) {
+            Collections.shuffle(messages, new Random(SimClock.getIntTime()));
+        } else {
+            Collections.sort(messages, forwardingStrategy);
         }
+        return tryMessagesForConnected(messages);	// try to send messages
     }
 
     @Override
@@ -319,5 +333,107 @@ public class ProphetRouter extends ActiveRouter {
         return r;
     }
 
-    
+    private interface ForwardingStrategy extends Comparator<Tuple<Message, Connection>> {
+
+        public int compare(Tuple<Message, Connection> tuple1,
+                Tuple<Message, Connection> tuple2);
+    }
+
+    /**
+     * (GRTRMax) Comparator for Message-Connection-Tuples that orders the tuples
+     * by their delivery probability by the host on the other side of the
+     * connection
+     */
+    private class GRTRMaxTupleComparator implements ForwardingStrategy {
+
+        public int compare(Tuple<Message, Connection> tuple1,
+                Tuple<Message, Connection> tuple2) {
+            // delivery probability of tuple1's message with tuple1's connection
+            double p1 = ((ProphetRouter) tuple1.getValue().
+                    getOtherNode(getHost()).getRouter()).getPredFor(
+                    tuple1.getKey().getTo());
+            // -"- tuple2...
+            double p2 = ((ProphetRouter) tuple2.getValue().
+                    getOtherNode(getHost()).getRouter()).getPredFor(
+                    tuple2.getKey().getTo());
+
+            // bigger probability should come first
+            if (p2 - p1 == 0) {
+                /* equal probabilities -> let queue mode decide */
+                return compareByQueueMode(tuple1.getKey(), tuple2.getKey());
+            } else if (p2 - p1 < 0) {
+                return -1;
+            } else {
+                return 1;
+            }
+        }
+    }
+
+    /**
+     * (GRTRSort)
+     */
+    private class GRTRSortTupleComparator implements ForwardingStrategy {
+
+        public int compare(Tuple<Message, Connection> tuple1,
+                Tuple<Message, Connection> tuple2) {
+            ProphetRouter otherRouter1 = (ProphetRouter) tuple1.getValue().
+                    getOtherNode(getHost()).getRouter();
+            ProphetRouter otherRouter2 = (ProphetRouter) tuple2.getValue().
+                    getOtherNode(getHost()).getRouter();
+
+            // delivery probability of tuple1's message with tuple1's connection
+            double pB1 = otherRouter1.getPredFor(
+                    tuple1.getKey().getTo());
+            double pA1 = getPredFor(
+                    tuple1.getKey().getTo());
+            // -"- tuple2...
+            double pB2 = otherRouter2.getPredFor(
+                    tuple2.getKey().getTo());
+            double pA2 = getPredFor(
+                    tuple2.getKey().getTo());
+
+            double difference1 = pB1 - pA1;
+            double difference2 = pB2 - pA2;
+
+            // bigger probability should come first
+            if (difference2 - difference1 == 0) {
+                /* equal probabilities -> let queue mode decide */
+                return compareByQueueMode(tuple1.getKey(), tuple2.getKey());
+            } else if (difference2 - difference1 < 0) {
+                return -1;
+            } else {
+                return 1;
+            }
+        }
+    }
+
+    private class GRTRTupleComparator implements ForwardingStrategy {
+
+        public int compare(Tuple<Message, Connection> tuple1,
+                Tuple<Message, Connection> tuple2) {
+            return compareByQueueMode(tuple1.getKey(), tuple2.getKey());
+        }
+    }
+
+    private enum ForwardingStrategyEnum {
+        GRTRMax("GRTRMax"),
+        GRTRSort("GRTRSort"),
+        GRTR("GRTR"),
+        COIN("COIN");
+
+        private final String name;
+
+        ForwardingStrategyEnum(String name) {
+            this.name = name;
+        }
+
+        public static ForwardingStrategyEnum of(String name) {
+            for (ForwardingStrategyEnum strategy : values()) {
+                if (strategy.name.equalsIgnoreCase(name)) {
+                    return strategy;
+                }
+            }
+            throw new IllegalArgumentException("Unknown forwarding strategy: " + name);
+        }
+    }
 }
